@@ -2,8 +2,11 @@ ArrayList<UIElement> uiElements = new ArrayList<UIElement>();
 ArrayList<ClickListener> mouseClickListeners = new ArrayList<ClickListener>();
 ArrayList<DragListener> mouseDragListeners = new ArrayList<DragListener>();
 
+//Keep a reference to these elements so a key can be mapped to their actions
+ToggleButton recordToggle;
+
 void createUI() {
-  ToggleButton recordToggle = new ToggleButton( this.g, dataFrameWidth+10, 10, "Record", false, 
+  recordToggle = new ToggleButton( this.g, dataFrameWidth+10, 10, "Record", false, 
     new ToggleAction() {
     public void toggle(boolean on) {
       if (on && !recording) {
@@ -80,6 +83,14 @@ void drawUI() {
     elem.update(this.g);
   }
 }
+
+void keyReleased() {
+  switch(key) {
+    case ' ':
+      recordToggle.toggle();
+  }
+}
+
 
 void mouseClicked() {
   for (ClickListener elem : mouseClickListeners) {
@@ -234,11 +245,15 @@ class ToggleButton implements UIElement, ClickListener {
   public float belowOf() {
     return y + totalHeight + 10;
   }
+  
+  public void toggle(){
+      this.on = !this.on;
+      this.action.toggle(this.on);
+  }
 
   public void mouseClicked() {
     if ( isMouseOver(x, y, totalWidth, totalHeight) ) {
-      this.on = !this.on;
-      this.action.toggle(this.on);
+      toggle();
     }
   }
 
