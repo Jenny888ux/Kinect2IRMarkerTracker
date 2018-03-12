@@ -247,7 +247,13 @@ class FrameRecorder {
             //  - write to destinationFile
             asBytes = (String.format(Locale.ROOT, "%f,%f,%f,%f,%f,%f", 
               centroid.x, centroid.y, centroid.z, 
-              normal.x, normal.y, normal.z) + System.getProperty("line.separator")).getBytes();
+              normal.x, normal.y, normal.z) + ","
+              + String.format(Locale.ROOT, "%f,%f,%f", 
+              marker1.x, marker1.y, marker1.z) + ","
+              + String.format(Locale.ROOT, "%f,%f,%f", 
+              marker2.x, marker2.y, marker2.z) + ","
+              + String.format(Locale.ROOT, "%f,%f,%f", 
+              marker3.x, marker3.y, marker3.z) + System.getProperty("line.separator")).getBytes();
 
             asyncCSVFile.write( ByteBuffer.wrap(asBytes), writePosition );
             writePosition += asBytes.length;
