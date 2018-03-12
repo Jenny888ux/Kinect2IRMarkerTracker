@@ -32,6 +32,7 @@ void setup() {
   if(settings == null){
     settings = new Settings();
   }
+  frameRecorder = new FrameRecorder();
   /*512 * 2 + 20*/
   size(1044, 424);
   createUI();

@@ -2,7 +2,7 @@ import java.nio.channels.AsynchronousFileChannel;
 import java.nio.file.*;
 import java.util.concurrent.*;
 
-FrameRecorder frameRecorder = new FrameRecorder();
+FrameRecorder frameRecorder;
 ExecutorService exportExecutor = Executors.newFixedThreadPool(1);
 Future<Boolean> exportResult = null;
 
