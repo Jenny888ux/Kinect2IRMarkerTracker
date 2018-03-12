@@ -6,13 +6,21 @@ FrameRecorder frameRecorder = new FrameRecorder();
 ExecutorService exportExecutor = Executors.newFixedThreadPool(1);
 Future<Boolean> exportResult = null;
 
+class BadConversionTable extends Exception{
+  public BadConversionTable(){
+    super("The size of the depth to camera space mapping table of the recording " +
+              "does not match the size of the depth frames.");
+  }
+}
 
 class FrameRecorder {
+  Path depthToCameraFilePath;
   Path filePath;
   AsynchronousFileChannel asyncFile;
   long nextPosition = 0;
 
   public FrameRecorder() {
+    depthToCameraFilePath = Paths.get(sketchPath() + File.separator + "data" + File.separator + "depthToCamera.float");
   }
 
   public FrameRecorder(String recordingID) {
@@ -20,13 +28,37 @@ class FrameRecorder {
   }
 
   public boolean prepare() {
+    //First check if the conversion table has already been saved
+    if ( !Files.exists(depthToCameraFilePath) ) {
+      //Save the depth to camera space conversion table
+      FloatBuffer mappingTable = kinect.getDepthToCameraSpaceTable();
+      //Transfer to a float array
+      float[] tmp = new float[dataFrameWidth * dataFrameHeight * 2];
+      mappingTable.get(tmp);
+
+      String serializedTable = Arrays.toString(tmp).replaceAll("\\[|\\]|\\s", "");
+      try {
+        // always create new file, failing if it already exists
+        OutputStream out = Files.newOutputStream(depthToCameraFilePath, StandardOpenOption.CREATE_NEW);
+        out.write( (serializedTable).getBytes() );
+        out.flush();
+        out.close();
+      }
+      catch(Exception e) {
+        e.printStackTrace();
+        return false;
+      }
+    }
+
     String recordingFileName = new Date().getTime()+".rec";
     filePath = Paths.get(sketchPath() + File.separator+ "data" + File.separator +recordingFileName);
+
     try {
       asyncFile = AsynchronousFileChannel.open(filePath, 
         StandardOpenOption.WRITE, 
         StandardOpenOption.CREATE);
-
+        nextPosition = 0;
+/*
       //Save the depth to camera space conversion table
       FloatBuffer mappingTable = kinect.getDepthToCameraSpaceTable();
       //Transfer to a float array
@@ -38,6 +70,7 @@ class FrameRecorder {
       byte[] asBytes = (serializedTable).getBytes();
       asyncFile.write(ByteBuffer.wrap(asBytes), 0);
       nextPosition = asBytes.length;
+      */
     }
     catch(Exception e) {
       e.printStackTrace();
@@ -137,6 +170,28 @@ class FrameRecorder {
     //  - compute 3D centroid
     return new PVector( accX/i, accY/i, accZ/i );
   }
+  
+  private float[] loadCameraSpaceTable() throws IOException, BadConversionTable{
+      //Open recording file
+      BufferedReader in = new BufferedReader(new FileReader( depthToCameraFilePath.toFile() ) );
+      
+      
+       //Read mapping table
+          String[] mappingTableStr = in.readLine().split(",");
+          if ( mappingTableStr.length != dataFrameWidth * dataFrameHeight * 2 ) {
+            in.close();
+            throw new BadConversionTable();
+          }
+          float[] cameraSpaceTable = new float[dataFrameWidth * dataFrameHeight * 2];
+          int i = 0;
+          for (String f : mappingTableStr) {
+            cameraSpaceTable[i] = Float.parseFloat(f);
+            i++;
+          }
+          in.close();
+          println("Mapping table loaded.");
+          return cameraSpaceTable;
+  }
 
   public Future<Boolean> exportToCSV(final File destinationFile) throws IOException {
 
@@ -148,26 +203,13 @@ class FrameRecorder {
         FileInputStream inputStream = null;
         Scanner scan = null;
         try {
+          //Read mapping table
+          float[] cameraSpaceTable = loadCameraSpaceTable();
+          
           //Open recording file
           inputStream = new FileInputStream( filePath.toFile() );
           scan = new Scanner(inputStream);
           scan.useDelimiter(java.util.regex.Pattern.compile(";"));
-
-          //Read mapping table
-          String[] mappingTableStr = scan.next().split(",");
-          if ( mappingTableStr.length != dataFrameWidth * dataFrameHeight * 2 ) {
-            println("Error: The size of the depth to camera space mapping table of the recording " +
-              "does not match the size of the depth frames.");
-            scan.close();
-            return false;
-          }
-          float[] cameraSpaceTable = new float[dataFrameWidth * dataFrameHeight * 2];
-          int i = 0;
-          for (String f : mappingTableStr) {
-            cameraSpaceTable[i] = Float.parseFloat(f);
-            i++;
-          }
-          println("Mapping table loaded.");
 
           //Open/create CSV file
           asyncCSVFile = AsynchronousFileChannel.open(destinationFile.toPath(), 
@@ -219,6 +261,10 @@ class FrameRecorder {
           inputStream.close();
           asyncCSVFile.force(false);
           asyncCSVFile.close();
+        }
+        catch(BadConversionTable e){
+          e.printStackTrace();
+          return false;
         }
         catch(IOException e) {
           e.printStackTrace();
